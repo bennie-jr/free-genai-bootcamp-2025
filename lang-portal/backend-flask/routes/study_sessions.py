@@ -65,6 +65,43 @@ def load(app):
     except Exception as e:
       return jsonify({"error": str(e)}), 500
 
+  @app.route('/api/study-sessions', methods=['POST'])
+  @cross_origin()
+  def create_study_session():
+    try:
+      data = request.get_json()
+      group_id = data.get('group_id')
+      study_activity_id = data.get('study_activity_id')
+
+      if not group_id or not study_activity_id:
+        return jsonify({'error': 'Missing required fields'}), 400
+
+      cursor = app.db.cursor()
+      
+      # Verify group exists
+      cursor.execute('SELECT id FROM groups WHERE id = ?', (group_id,))
+      if not cursor.fetchone():
+        return jsonify({'error': 'Group not found'}), 404
+
+      # Verify study activity exists
+      cursor.execute('SELECT id FROM study_activities WHERE id = ?', (study_activity_id,))
+      if not cursor.fetchone():
+        return jsonify({'error': 'Study activity not found'}), 404
+
+      # Create study session
+      cursor.execute('''
+        INSERT INTO study_sessions (group_id, study_activity_id, created_at)
+        VALUES (?, ?, datetime('now'))
+      ''', (group_id, study_activity_id))
+      app.db.commit()
+      
+      session_id = cursor.lastrowid
+      return jsonify({'session_id': session_id}), 201
+
+    except Exception as e:
+      app.db.rollback()
+      return jsonify({'error': str(e)}), 500
+
   @app.route('/api/study-sessions/<id>', methods=['GET'])
   @cross_origin()
   def get_study_session(id):
